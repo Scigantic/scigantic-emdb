@@ -45,6 +45,19 @@ from scigantic_empiar import _search as S  # noqa: E402
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PKG = os.path.join(_HERE, os.pardir, "scigantic_emdb")
 
+
+def _package_source():
+    """Every .py in the package, concatenated.
+
+    The library used to be one file, so these checks read __init__.py. After the
+    split a banned or required name can live in any module, and scanning only
+    __init__.py would quietly stop checking anything.
+    """
+    import glob
+    return "\n".join(open(f, encoding="utf-8").read()
+                     for f in sorted(glob.glob(os.path.join(_PKG, "*.py"))))
+
+
 # Mirrors scigantic_emdb.SEARCH_FIELDS / FIELD_WEIGHT. Kept literal here so the
 # test fails loudly if the package changes them without updating these tests.
 FIELDS = ("title", "sample_name", "organism", "method",
@@ -242,11 +255,7 @@ class TestAccessionNormalisation(unittest.TestCase):
     def _acc():
         # Import the package's own acc() without pulling numpy/mrcfile: the
         # module is import-light by design (see _load_search in __init__).
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            "_emdb_pkg", os.path.join(_PKG, "__init__.py"))
-        m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
+        import scigantic_emdb as m
         return m.acc
 
     def test_pads_short_accessions(self):
@@ -263,11 +272,7 @@ class TestAccessionNormalisation(unittest.TestCase):
         """Verified against the live FTP tree: EMD-0339/map/emd_0339.map.gz is
         206, EMD-0339/map/emd_339.map.gz is 404. The pad appears in both, so
         dropping it breaks the path twice over."""
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            "_emdb_pkg2", os.path.join(_PKG, "__init__.py"))
-        m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
+        import scigantic_emdb as m
         self.assertTrue(m.map_path(339, local=True).endswith(
             "/EMD-0339/map/emd_0339.map.gz"))
         self.assertTrue(m.map_path("EMD-22962", local=True).endswith(
@@ -284,12 +289,21 @@ class TestEntryFiles(unittest.TestCase):
 
     @staticmethod
     def _mod():
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            "_emdb_ef", os.path.join(_PKG, "__init__.py"))
-        m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
-        return m
+        """Public surface: the package root."""
+        import scigantic_emdb
+        return scigantic_emdb
+
+    @staticmethod
+    def _coerce():
+        """NaN-safe coercions live in their own module now."""
+        from scigantic_emdb import _coerce
+        return _coerce
+
+    @staticmethod
+    def _query():
+        """Vocabulary and the shared query layer."""
+        from scigantic_emdb import _query
+        return _query
 
     def test_subdirs_cover_the_documented_layout(self):
         m = self._mod()
@@ -350,21 +364,30 @@ class TestEnrichmentFilters(unittest.TestCase):
 
     @staticmethod
     def _mod():
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            "_emdb_enr", os.path.join(_PKG, "__init__.py"))
-        m = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(m)
-        return m
+        """Public surface: the package root."""
+        import scigantic_emdb
+        return scigantic_emdb
+
+    @staticmethod
+    def _coerce():
+        """NaN-safe coercions live in their own module now."""
+        from scigantic_emdb import _coerce
+        return _coerce
+
+    @staticmethod
+    def _query():
+        """Vocabulary and the shared query layer."""
+        from scigantic_emdb import _query
+        return _query
 
     def test_num_ok_excludes_missing_values(self):
-        n = self._mod()._num_ok
+        n = self._coerce()._num_ok
         self.assertFalse(n(None, None, 100), "missing value must not pass a bound")
         self.assertFalse(n(float("nan"), None, 100), "NaN must not pass a bound")
         self.assertTrue(n(None, None, None), "no bound means don't care")
 
     def test_num_ok_bounds_are_inclusive(self):
-        n = self._mod()._num_ok
+        n = self._coerce()._num_ok
         self.assertTrue(n(100.0, None, 100))
         self.assertTrue(n(100.0, 100, None))
         self.assertFalse(n(100.1, None, 100))
@@ -372,7 +395,7 @@ class TestEnrichmentFilters(unittest.TestCase):
     def test_truthy_is_nan_safe(self):
         """A column absent from a partial index reads back as NaN, and NaN is
         truthy in Python — so `if row.get("has_mask")` passes EVERY row."""
-        t = self._mod()._truthy
+        t = self._coerce()._truthy
         self.assertFalse(t(float("nan")), "NaN must not read as True")
         self.assertFalse(t(None))
         self.assertTrue(t(True))
@@ -393,7 +416,7 @@ class TestEnrichmentFilters(unittest.TestCase):
         NaN straight to the for-loop. Same root cause as `if row.get("has_mask")`
         passing every row, and it only surfaced against a real DataFrame with
         missing values, not against dict fixtures."""
-        f = self._mod()._as_list
+        f = self._coerce()._as_list
         self.assertEqual(f(float("nan")), [])
         self.assertEqual(f(None), [])
         self.assertEqual(f([]), [])
@@ -409,7 +432,7 @@ class TestEnrichmentFilters(unittest.TestCase):
         as search("GPCR") returning zero — deposited vocabulary versus spoken.
         After aliasing: ATP 4 -> 971, GTP 2 -> 464, NAG -> 2,334.
         """
-        al = self._mod().LIGAND_ALIASES
+        al = self._query().LIGAND_ALIASES
         self.assertEqual(al["atp"], "adenosine-5'-triphosphate")
         self.assertEqual(al["gtp"], "guanosine-5'-triphosphate")
         for k, v in al.items():
@@ -419,7 +442,7 @@ class TestEnrichmentFilters(unittest.TestCase):
     def test_ligand_aliases_do_not_shadow_full_names(self):
         """A user who types the deposited name must be unaffected: the alias map
         is a fallback for abbreviations, not a rewrite of every query."""
-        al = self._mod().LIGAND_ALIASES
+        al = self._query().LIGAND_ALIASES
         for spelled_out in ("cholesterol", "magnesium ion", "cardiolipin"):
             self.assertNotIn(spelled_out, al,
                              f"{spelled_out!r} is already the deposited name")
@@ -455,8 +478,7 @@ class TestCatalogHonesty(unittest.TestCase):
         empty in EBI Search and not read from the REST API either.
         """
         import re
-        with open(os.path.join(_PKG, "__init__.py"), encoding="utf-8") as fh:
-            pkg = fh.read()
+        pkg = _package_source()
         for banned in ("vitrificationinstrument", "synspeciesname"):
             self.assertNotIn(
                 f'"{banned}"', pkg,
@@ -476,8 +498,7 @@ class TestCatalogHonesty(unittest.TestCase):
 
     def test_search_fields_match_package(self):
         """These tests must score over the same fields the package does."""
-        with open(os.path.join(_PKG, "__init__.py"), encoding="utf-8") as fh:
-            pkg = fh.read()
+        pkg = _package_source()
         for f in FIELDS:
             self.assertIn(f'"{f}"', pkg, f"{f} missing from the package")
 
