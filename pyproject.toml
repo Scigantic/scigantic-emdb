@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scigantic-emdb"
+version = "0.1.0"
+description = "Search every structure in EMDB from Python — 60,895 cryo-EM maps by protein, organism, resolution, molecular weight and PDB cross-reference, then read one in two calls."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Scigantic" }]
+keywords = ["cryo-em", "cryo-et", "emdb", "empiar", "mrc", "structural-biology", "microscopy"]
+dependencies = [
+    "requests",
+    "pandas",
+    # The query layer (synonym vocabulary, whole-word plural-tolerant matching,
+    # literal-over-synonym ranking) lives in scigantic-empiar and is imported,
+    # never copied — one implementation, so its fixes cannot diverge. 0.3.0 is
+    # the first release at parity with the shipping source.
+    "scigantic-empiar>=0.3.0",
+]
+
+[project.optional-dependencies]
+# load_map() reads CCP4/MRC volumes; slices()/gallery() render them.
+maps = ["numpy", "mrcfile", "matplotlib", "ipython"]
+dev = ["pytest", "numpy", "mrcfile", "matplotlib"]
+
+[project.urls]
+Homepage = "https://github.com/scigantic/scigantic-emdb"
+"EMDB" = "https://www.ebi.ac.uk/emdb/"
+"EMPIAR (raw data)" = "https://github.com/scigantic/scigantic-empiar"
+
+[tool.setuptools]
+packages = ["scigantic_emdb"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
