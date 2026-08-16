@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scigantic-emdb"
-version = "0.4.0"
+version = "0.4.1"
 description = "Search every structure in EMDB from Python — 60,895 cryo-EM maps by protein, organism, resolution, molecular weight and PDB cross-reference, then read one in two calls."
 readme = "README.md"
 requires-python = ">=3.9"
