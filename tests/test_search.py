@@ -498,6 +498,53 @@ class TestRawDataFilters(unittest.TestCase):
             self.assertIn(kw, names)
 
 
+class TestLigandClassification(unittest.TestCase):
+    """37.2% of EMDB has "a ligand", but 34,700 of 56,321 deposited mentions are
+    ions, water, glycans or the lipids and detergents used in sample prep.
+    Reporting that as ligand-bound overstates it by 15 points; the honest figure
+    is 21.9%. has_ligand filters on the notable class, while ligand="..." still
+    substring-matches the full list so nothing is hidden.
+    """
+
+    @staticmethod
+    def _nl():
+        from scigantic_emdb._query import notable_ligands
+        return notable_ligands
+
+    def test_incidental_ligands_are_excluded(self):
+        nl = self._nl()
+        for junk in ("MAGNESIUM ION", "ZINC ION", "water", "CHOLESTEROL",
+                     "IRON/SULFUR CLUSTER", "DODECYL-BETA-D-MALTOSIDE",
+                     "2-acetamido-2-deoxy-beta-D-glucopyranose",
+                     "alpha-D-mannopyranose", "SPHINGOSINE"):
+            self.assertEqual(nl([junk]), [], f"{junk!r} should be incidental")
+
+    def test_real_bound_molecules_survive(self):
+        nl = self._nl()
+        for keep in ("ADENOSINE-5'-TRIPHOSPHATE", "GUANOSINE-5'-DIPHOSPHATE",
+                     "FLAVIN MONONUCLEOTIDE", "PROTOPORPHYRIN IX CONTAINING FE",
+                     "BETA-CAROTENE", "SPERMIDINE"):
+            self.assertEqual(nl([keep]), [keep], f"{keep!r} should be notable")
+
+    def test_alkyl_fragments_do_not_eat_drug_names(self):
+        """'hexyl' occurs inside real drug names ('...2-oxocyclohexyl...'), so
+        bare alkyl fragments are deliberately not matched."""
+        nl = self._nl()
+        drug = "4-{(2R)-2-[(1S,3S,5S)-3,5-dimethyl-2-oxocyclohexyl]-2-hydroxyethyl}"
+        self.assertEqual(nl([drug]), [drug])
+
+    def test_nan_safe(self):
+        nl = self._nl()
+        self.assertEqual(nl(float("nan")), [])
+        self.assertEqual(nl(None), [])
+
+    def test_search_exposes_the_new_filters(self):
+        import scigantic_emdb
+        names = scigantic_emdb.EmdbCatalog.search.__code__.co_varnames
+        for kw in ("has_ligand", "min_proteins", "max_proteins"):
+            self.assertIn(kw, names)
+
+
 class TestCatalogHonesty(unittest.TestCase):
     """Defect 1 and 7: claims must be measured, and fields must be populated."""
 

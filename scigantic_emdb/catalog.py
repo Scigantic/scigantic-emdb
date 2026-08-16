@@ -4,7 +4,7 @@ import gzip
 
 from ._coerce import _as_list, _nonempty, _num_ok, _truthy
 from ._query import (FIELD_WEIGHT, LIGAND_ALIASES, SEARCH_FIELDS, adaptive_terms,
-                     field_text, match_score)
+                     field_text, match_score, notable_ligands)
 from .accession import acc, image_url
 from .config import CATALOG_URL, MOUNT, _session
 
@@ -83,7 +83,8 @@ class EmdbCatalog:
                max_chain_kda=None, min_chain_kda=None, complex_kda_max=None,
                complex_kda_min=None, has_half_maps=None, has_mask=None,
                has_model=None, microscope=None, ligand=None,
-               has_raw_data=None, max_raw_gb=None, min_raw_gb=None):
+               has_raw_data=None, max_raw_gb=None, min_raw_gb=None,
+               min_proteins=None, max_proteins=None, has_ligand=None):
         """Find structures by scientific content.
 
         query       free text over title, sample name, organism, method and
@@ -118,6 +119,20 @@ class EmdbCatalog:
                         deposit their raw data; that is an archive fact, not an
                         index gap. EMDB itself never records the link, so it
                         comes from EMPIAR's cross-reference.
+        min_proteins    minimum distinct protein chains. min_proteins=2 is
+                        "complexes only", which is 60% of the entries that report
+                        chains; max_proteins=1 is "a single protein on its own".
+                        A drug bound to its target is a complex, so this pairs
+                        with has_ligand for pharmacology questions.
+        max_proteins    upper bound on distinct protein chains.
+        has_ligand      require a NOTABLE bound molecule — nucleotides,
+                        cofactors, inhibitors, drugs. Deliberately excludes ions,
+                        water, glycosylation sugars and the lipids/detergents
+                        used in sample prep, which are 34,263 of the 56,321
+                        deposited ligand mentions. Counting those would report
+                        37.2% of EMDB as ligand-bound; the honest figure is
+                        22.3%. Use ligand="..." to substring-match the FULL list,
+                        including ions.
         max_raw_gb      bound on the raw dataset size, summed across linked
                         EMPIAR entries. Cryo-EM raw data is large: the median
                         linked dataset runs to hundreds of GB, so this is the
@@ -188,6 +203,10 @@ class EmdbCatalog:
                 return False
             if ligand_q and ligand_q not in field_text(r.get("ligands")).lower():
                 return False
+            if not _num_ok(r.get("n_proteins"), min_proteins, max_proteins):
+                return False
+            if has_ligand is not None and bool(notable_ligands(r.get("ligands"))) != bool(has_ligand):
+                return False
             if has_raw_data is not None and bool(_nonempty(r.get("empiar_ids"))) != bool(has_raw_data):
                 return False
             if not _num_ok(r.get("raw_size_gb"), min_raw_gb, max_raw_gb):
@@ -218,7 +237,8 @@ class EmdbCatalog:
         if out.empty:
             return out
         preferred = ["id", "title", "sample_name", "resolution_a", "method",
-                     "organism", "max_chain_kda", "complex_kda", "has_half_maps",
+                     "organism", "n_proteins", "ligands", "max_chain_kda",
+                     "complex_kda", "has_half_maps",
                      "has_mask", "empiar_ids", "raw_size_gb", "pdb_ids", "year"]
         cols = [c for c in preferred if c in out.columns]
         return out[cols + [c for c in out.columns if c not in cols]]

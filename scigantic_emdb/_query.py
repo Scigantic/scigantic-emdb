@@ -6,6 +6,7 @@ holds cannot diverge between them. See SYNC.md.
 """
 from __future__ import annotations
 import os
+import re
 
 
 # One search implementation, shared with scigantic_empiar rather than copied.
@@ -139,3 +140,47 @@ LIGAND_ALIASES = {
     "iron-sulfur": "iron/sulfur cluster",
     "pc": "1,2-diacyl-sn-glycero-3-phosphocholine",
 }
+
+
+# Most "ligands" are not what anyone means by a bound molecule. Of 56,321 ligand
+# mentions across the archive, 34,263 are ions, water, glycosylation sugars, or
+# the lipids and detergents used to keep a membrane protein folded during sample
+# prep. Counting those makes 37.2% of EMDB look ligand-bound when the figure for
+# something functionally interesting is 22.3%.
+#
+# This excludes the incidental class only. Nucleotides (ATP/GTP), cofactors
+# (FMN, heme, NADPH), pigments and every drug or inhibitor survive, because
+# those tell you something about what the structure was doing.
+#
+# Two deliberate judgement calls, both arguable: cholesterol and iron-sulfur
+# clusters are classed incidental. Cholesterol is overwhelmingly a membrane
+# mimetic here, and Fe/S clusters are structural in most depositions — but both
+# are genuinely functional in some. The raw `ligands` list is never filtered, so
+# `ligand="cholesterol"` still finds all 976 of them.
+INCIDENTAL_LIGAND = re.compile(
+    r"(?<!\w)IONS?(?!\w)"
+    r"|^water$|(?<!\w)WATER(?!\w)"
+    r"|CLUSTER"
+    r"|pyranos|furanos|sacchar|mannose|galactos|N-ACETYL|glycan"
+    r"|CHOLESTEROL|CARDIOLIPIN|phosphatidyl|glycero|sn-glycer"
+    r"|maltoside|CHAPS|DECANE|DODECYL|LAURYL|OCTYL|monoolein"
+    r"|palmitic|stearoyl|oleoyl|hexadecanoyl|myristic|lauric"
+    r"|SPHINGOSINE|ceramide|phosphocholine|phosphoethanolamine"
+    r"|POLYETHYLENE GLYCOL|(?<!\w)PEG(?!\w)",
+    re.I)
+
+# Deliberately NOT matched: bare alkyl fragments like "hexyl" or "nonyl". They
+# appear inside perfectly good drug names ("...2-oxocyclohexyl...") and would
+# throw away real hits to catch a handful of detergents. The filter reduces the
+# incidental class, it does not eliminate it — roughly 650 lipid-like mentions
+# with IUPAC names survive, mostly signalling lipids such as PIP2, which are
+# arguably functional anyway.
+
+
+def notable_ligands(ligands):
+    """Deposited ligands minus ions, solvent, glycans and membrane mimetics."""
+    if not ligands or ligands != ligands:
+        return []
+    if isinstance(ligands, str):
+        ligands = [ligands]
+    return [L for L in ligands if L and not INCIDENTAL_LIGAND.search(str(L))]
