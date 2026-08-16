@@ -82,7 +82,8 @@ class EmdbCatalog:
                year=None, min_year=None, max_year=None, sort="relevance",
                max_chain_kda=None, min_chain_kda=None, complex_kda_max=None,
                complex_kda_min=None, has_half_maps=None, has_mask=None,
-               has_model=None, microscope=None, ligand=None):
+               has_model=None, microscope=None, ligand=None,
+               has_raw_data=None, max_raw_gb=None, min_raw_gb=None):
         """Find structures by scientific content.
 
         query       free text over title, sample name, organism, method and
@@ -111,6 +112,17 @@ class EmdbCatalog:
         has_model       require a fitted atomic model.
         microscope      substring, e.g. "KRIOS", "JEOL".
         ligand          substring matched against deposited ligand names.
+        has_raw_data    require (or exclude) public raw movies in EMPIAR — the
+                        filter for "a structure I could actually reprocess".
+                        Only 8.2% of EMDB qualifies, because most groups do not
+                        deposit their raw data; that is an archive fact, not an
+                        index gap. EMDB itself never records the link, so it
+                        comes from EMPIAR's cross-reference.
+        max_raw_gb      bound on the raw dataset size, summed across linked
+                        EMPIAR entries. Cryo-EM raw data is large: the median
+                        linked dataset runs to hundreds of GB, so this is the
+                        difference between "reprocessable" and "reprocessable
+                        by me".
 
         A record missing the field being filtered on is EXCLUDED, never silently
         kept. Molecular fields come from depositions and are not universal, so
@@ -176,6 +188,10 @@ class EmdbCatalog:
                 return False
             if ligand_q and ligand_q not in field_text(r.get("ligands")).lower():
                 return False
+            if has_raw_data is not None and bool(_nonempty(r.get("empiar_ids"))) != bool(has_raw_data):
+                return False
+            if not _num_ok(r.get("raw_size_gb"), min_raw_gb, max_raw_gb):
+                return False
             return True
 
         hits = [r for r in records if keep(r)]
@@ -189,6 +205,11 @@ class EmdbCatalog:
         elif sort == "year":
             hits.sort(key=lambda r: -(r.get("year") or 0
                                       if r.get("year") == r.get("year") else 0))
+        elif sort == "raw_size":
+            # Cheapest-to-reprocess first. Entries with no raw data sort last
+            # rather than appearing to be free.
+            hits.sort(key=lambda r: (not _nonempty(r.get("empiar_ids")),
+                                     r.get("raw_size_gb") if r.get("raw_size_gb") == r.get("raw_size_gb") else 1e12))
         elif sort == "id":
             hits.sort(key=lambda r: int(r.get("n", 0) or 0))
 
@@ -198,7 +219,7 @@ class EmdbCatalog:
             return out
         preferred = ["id", "title", "sample_name", "resolution_a", "method",
                      "organism", "max_chain_kda", "complex_kda", "has_half_maps",
-                     "has_mask", "pdb_ids", "year"]
+                     "has_mask", "empiar_ids", "raw_size_gb", "pdb_ids", "year"]
         cols = [c for c in preferred if c in out.columns]
         return out[cols + [c for c in out.columns if c not in cols]]
 

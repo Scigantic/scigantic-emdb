@@ -459,6 +459,45 @@ class TestEnrichmentFilters(unittest.TestCase):
         self.assertIn("* 1000.0", src, "MDa -> kDa conversion missing")
 
 
+class TestRawDataFilters(unittest.TestCase):
+    """Cross-referencing EMDB to EMPIAR is the question KEK actually asks:
+    "which of these structures can I reprocess". Before these filters it took a
+    search, then a join, then a post-filter on the joined frame — three steps
+    the in-notebook assistant had to know to chain. Now it is one search.
+
+    Only EMPIAR records the link; EMDB's REST document exposes citation_list and
+    pdb_list and never mentions EMPIAR, even for EMD-13880 which pairs with
+    EMPIAR-10877. So empiar_ids is a build-time join, and only 8.2% of entries
+    have it.
+    """
+
+    @staticmethod
+    def _coerce():
+        from scigantic_emdb import _coerce
+        return _coerce
+
+    def test_missing_raw_size_excluded_from_a_bound(self):
+        """A structure with no raw data must not pass max_raw_gb. Keeping it
+        would answer 'reprocessable under 1 TB' with entries having no raw data
+        at all — the same exclusion rule as the weight filters."""
+        n = self._coerce()._num_ok
+        self.assertFalse(n(None, None, 1000))
+        self.assertFalse(n(float("nan"), None, 1000))
+
+    def test_has_raw_data_is_nan_safe(self):
+        """empiar_ids is absent on 91.8% of rows, so it reads back as NaN."""
+        ne = self._coerce()._nonempty
+        self.assertFalse(ne(float("nan")))
+        self.assertFalse(ne([]))
+        self.assertTrue(ne(["10877"]))
+
+    def test_search_exposes_the_filters(self):
+        import scigantic_emdb
+        names = scigantic_emdb.EmdbCatalog.search.__code__.co_varnames
+        for kw in ("has_raw_data", "max_raw_gb", "min_raw_gb"):
+            self.assertIn(kw, names)
+
+
 class TestCatalogHonesty(unittest.TestCase):
     """Defect 1 and 7: claims must be measured, and fields must be populated."""
 
