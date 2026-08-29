@@ -95,52 +95,6 @@ LIGAND_ALIASES = {
     "pc": "1,2-diacyl-sn-glycero-3-phosphocholine",
 }
 
-_S = _load_search()
-adaptive_terms, expand_query = _S.adaptive_terms, _S.expand_query
-field_text, match_score = _S.field_text, _S.match_score
-
-# Fields the free-text query runs over, with EMDB's names. `title` and
-# `sample_name` carry the science; `organism` and the accession lists are worth
-# matching but should not outrank a title hit.
-SEARCH_FIELDS = ("title", "sample_name", "organism", "method",
-                 "pdb_ids", "uniprot_ids", "id", "paper_title")
-FIELD_WEIGHT = {"title": 3, "sample_name": 3, "paper_title": 2,
-                "pdb_ids": 2, "uniprot_ids": 2, "id": 2,
-                "organism": 1, "method": 1}
-
-# Ligands are deposited under full chemical names, so the abbreviation a
-# scientist actually types finds almost nothing: ligand="ATP" matched 4 entries
-# against 965 deposited as "ADENOSINE-5'-TRIPHOSPHATE", and "GTP" matched 2
-# against 434. That is the same failure as search("GPCR") returning zero across
-# the archive: the deposited vocabulary and the spoken one differ.
-#
-# Every target below was read off the deposited names in the built catalog, not
-# invented. Values are substrings, matched case-insensitively, so "ADENOSINE-5'"
-# covers both the triphosphate and diphosphate spellings where that is intended.
-LIGAND_ALIASES = {
-    "atp": "adenosine-5'-triphosphate",
-    "adp": "adenosine-5'-diphosphate",
-    "gtp": "guanosine-5'-triphosphate",
-    "gdp": "guanosine-5'-diphosphate",
-    "amp-pnp": "phosphoaminophosphonic acid-adenylate ester",
-    "amppnp": "phosphoaminophosphonic acid-adenylate ester",
-    "atp-gamma-s": "phosphothiophosphoric acid-adenylate ester",
-    "fmn": "flavin mononucleotide",
-    "nadph": "nadph",
-    "heme": "protoporphyrin ix containing fe",
-    "haem": "protoporphyrin ix containing fe",
-    "chs": "cholesterol hemisuccinate",
-    "ddm": "dodecyl-beta-d-maltoside",
-    "nag": "2-acetamido-2-deoxy-beta-d-glucopyranose",
-    "glcnac": "2-acetamido-2-deoxy-beta-d-glucopyranose",
-    "mg": "magnesium ion",
-    "zn": "zinc ion",
-    "ca": "calcium ion",
-    "fe/s": "iron/sulfur cluster",
-    "iron-sulfur": "iron/sulfur cluster",
-    "pc": "1,2-diacyl-sn-glycero-3-phosphocholine",
-}
-
 
 # Most "ligands" are not what anyone means by a bound molecule. Of 56,321 ligand
 # mentions across the archive, 34,263 are ions, water, glycosylation sugars, or
