@@ -33,24 +33,25 @@ def entry_files(entry_id):
     return _entry_files_http(a)
 
 def _entry_files_http(a):
-    """List an entry's subdirectories from EBI's autoindex over HTTPS."""
+    """List an entry's subdirectories from EBI's autoindex over HTTPS.
+
+    Deliberately does not catch request failures. Swallowing them into {}
+    would reproduce the exact ambiguity entry_files() exists to avoid: a
+    caller cannot tell "EBI could not be reached" from "this entry deposited
+    nothing". Let requests.exceptions.RequestException (timeout, connection
+    error, non-2xx status) propagate instead, matching EmdbCatalog.load().
+    """
     import re
     s = _session()
-    try:
-        top = s.get(f"{FTP}/{a}/", timeout=30)
-        top.raise_for_status()
-    except Exception:
-        return {}
+    top = s.get(f"{FTP}/{a}/", timeout=30)
+    top.raise_for_status()
     present = set(re.findall(r'href="([a-z_]+)/"', top.text)) & set(SUBDIRS)
     out = {}
     for sub in SUBDIRS:
         if sub not in present:
             continue
-        try:
-            r = s.get(f"{FTP}/{a}/{sub}/", timeout=30)
-            r.raise_for_status()
-            names = re.findall(r'href="([^"/?][^"/]*)"', r.text)
-            out[sub] = sorted(n for n in names if "." in n)
-        except Exception:
-            continue
+        r = s.get(f"{FTP}/{a}/{sub}/", timeout=30)
+        r.raise_for_status()
+        names = re.findall(r'href="([^"/?][^"/]*)"', r.text)
+        out[sub] = sorted(n for n in names if "." in n)
     return out

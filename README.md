@@ -1,5 +1,10 @@
 # scigantic-emdb
 
+[![CI](https://github.com/Scigantic/scigantic-emdb/actions/workflows/ci.yml/badge.svg)](https://github.com/Scigantic/scigantic-emdb/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/scigantic-emdb)](https://pypi.org/project/scigantic-emdb/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/scigantic-emdb)](https://pypi.org/project/scigantic-emdb/)
+[![License](https://img.shields.io/github/license/Scigantic/scigantic-emdb)](https://github.com/Scigantic/scigantic-emdb/blob/main/LICENSE)
+
 Search every structure in [EMDB](https://www.ebi.ac.uk/emdb/), EMBL-EBI's public archive of 3D cryo-EM density maps, and read one in two calls.
 
 ```bash
@@ -110,5 +115,6 @@ The query layer is imported from [`scigantic-empiar`](https://pypi.org/project/s
 - `load_map()` works with or without the archive mounted. Off-mount it fetches from EBI.
 - `entry_files()` reports only what an entry actually deposited. Half-maps, masks and FSC curves are per-deposition, so check rather than assume.
 - Accessions are zero-padded to four digits. `acc(339)` gives `EMD-0339`, which is the entry that exists.
+- Inside a [Scigantic](https://scigantic.com) cryo-EM notebook this is preinstalled and the archive is also FUSE-mounted. Standalone, it streams straight from EBI.
 
 MIT licensed. EMDB data is CC0. Please cite EMDB.

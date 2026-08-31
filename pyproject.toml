@@ -4,21 +4,34 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scigantic-emdb"
-version = "0.4.2"
+version = "0.4.3"
 description = "Search every structure in EMDB from Python — 60,895 cryo-EM maps by protein, organism, resolution, molecular weight and PDB cross-reference, then read one in two calls."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "Scigantic" }]
 keywords = ["cryo-em", "cryo-et", "emdb", "empiar", "mrc", "structural-biology", "microscopy"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
 dependencies = [
-    "requests",
-    "pandas",
+    "requests>=2.28,<3",
+    "pandas>=1.5,<4",
     # The query layer (synonym vocabulary, whole-word plural-tolerant matching,
     # literal-over-synonym ranking) lives in scigantic-empiar and is imported,
     # never copied — one implementation, so its fixes cannot diverge. 0.3.0 is
-    # the first release at parity with the shipping source.
-    "scigantic-empiar>=0.3.0",
+    # the first release at parity with the shipping source; 0.4.0 is the
+    # current live release as of this pin.
+    "scigantic-empiar>=0.4.0,<1",
 ]
 
 [project.optional-dependencies]
@@ -27,9 +40,11 @@ maps = ["numpy", "mrcfile", "matplotlib", "ipython"]
 dev = ["pytest", "numpy", "mrcfile", "matplotlib"]
 
 [project.urls]
-Homepage = "https://github.com/scigantic/scigantic-emdb"
+Homepage = "https://scigantic.com"
+Repository = "https://github.com/Scigantic/scigantic-emdb"
+Issues = "https://github.com/Scigantic/scigantic-emdb/issues"
 "EMDB" = "https://www.ebi.ac.uk/emdb/"
-"EMPIAR (raw data)" = "https://github.com/scigantic/scigantic-empiar"
+"EMPIAR (raw data)" = "https://github.com/Scigantic/scigantic-empiar"
 
 [tool.setuptools]
 packages = ["scigantic_emdb"]
