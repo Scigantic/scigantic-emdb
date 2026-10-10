@@ -40,6 +40,18 @@ Filters: `max_res`, `min_res`, `organism`, `method`, `microscope`, `ligand`, `ha
 
 `max_chain_kda` is the largest single protein chain, which is what you want for "a receptor under 100 kDa". The assembled complex carries the G protein and often a nanobody, so it is almost always heavier than the molecule of interest. Measured across the catalog, entries with a chain at or under 100 kDa have a median complex weight of 240 kDa.
 
+Acquisition and reconstruction filters, read from the deposit: `voltage_kv`, `detector`, `min_dose`/`max_dose`, `min_particles`/`max_particles`, `symmetry`, `min_pixel_a`/`max_pixel_a` (the deposited map's pixel size, not the movies'), and `min_chain_copies`/`max_chain_copies` (the oligomeric order of a single protein).
+
+```python
+# 300 kV K3 datasets whose raw movies are public and under 400 GB
+cat.search(method="single-particle reconstruction", voltage_kv=300, detector="K3",
+           has_raw_data=True, max_raw_gb=400, sort="year")
+```
+
+Two caveats. `dose_e_a2` is whatever the depositor typed: 84% of values are 20-100 e/A^2 totals, but 11% are under 5 and are almost certainly per-frame or per-second, so use `min_dose=20` when you mean a total. And recording mode, movie count, Cs and software are in the records but filled for only 19-57% of entries, so they are not filters.
+
+`cat.datasets_with_multiple_states()` lists EMPIAR datasets whose deposited maps differ in copy number, point group, or the oligomer named in the title (monomer versus trimer). It ranks candidates for a person to read. One state deposited with and without imposed symmetry (C1 and D2) also trips it, and a dataset whose states the depositor never named does not.
+
 ## Coverage
 
 ```python
@@ -61,6 +73,15 @@ Molecular fields depend on what each group chose to deposit, so they are not uni
 | `max_chain_kda` | 58.5% |
 | `has_mask` | 26.4% |
 | `has_raw_data` | 8.2% |
+| `voltage_kv` | 100% |
+| `detector` | 99.5% |
+| `dose_e_a2` | 98.8% |
+| `particles_used` | 93.6% |
+| `protein_copies`, `max_chain_copies` | 66.5% |
+| `recon_software` | 57.4% |
+| `cs_mm` | 35.4% |
+| `n_movies` | 28.7% |
+| `recording_mode` | 19.3% |
 
 A record missing the field you filter on is excluded, never silently kept. So "12 structures match" means twelve among those that deposited a weight, not twelve in EMDB. Read the real numbers from `cat.coverage()["enrichment"]["field_fill_pct"]`.
 

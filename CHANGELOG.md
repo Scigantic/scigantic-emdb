@@ -5,6 +5,15 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+### Changed
+- `datasets_with_multiple_states()` also counts distinct oligomer words in the map
+  titles (monomer, trimer, ...) and returns them as `title_states`. The copy-number
+  and point-group signals missed EMPIAR-10176, whose monomer and trimer maps share
+  both. The docstring now lists how each signal can mislead.
+- The `min_dose`/`max_dose` docstring says the units are not uniform: 11% of
+  deposited values are under 5 e/A^2 and are almost certainly per-frame or
+  per-second, so `min_dose=20` selects totals.
+
 ### Added
 - `EmdbCatalog.search()` filters on acquisition and reconstruction fields read from
   the deposit: `voltage_kv`, `detector`, `min_dose`/`max_dose`,
