@@ -22,6 +22,20 @@ def _truthy(v):
         return False
     return bool(v)
 
+def _near(v, target, tol):
+    """True if `v` is within `tol` of `target`. A record with no value is EXCLUDED,
+    for the same reason as _num_ok: keeping it would pad the result with entries
+    that never reported the field."""
+    if target is None:
+        return True
+    if v is None or (isinstance(v, float) and v != v):
+        return False
+    try:
+        return abs(float(v) - float(target)) <= tol
+    except (TypeError, ValueError):
+        return False
+
+
 def _num_ok(v, lo, hi):
     """Range check that EXCLUDES a record with no value for the field.
 

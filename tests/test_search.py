@@ -545,6 +545,87 @@ class TestLigandClassification(unittest.TestCase):
             self.assertIn(kw, names)
 
 
+class TestAcquisitionFilters(unittest.TestCase):
+    """Acquisition filters come from the deposit and are only offered where the
+    deposit populates them. A filter on a sparse field would read an absent value
+    as a negative, so the sparse ones are not filters."""
+
+    def test_search_exposes_the_acquisition_filters(self):
+        import scigantic_emdb
+        names = scigantic_emdb.EmdbCatalog.search.__code__.co_varnames
+        for kw in ("voltage_kv", "detector", "min_dose", "max_dose",
+                   "min_particles", "max_particles", "symmetry",
+                   "min_pixel_a", "max_pixel_a"):
+            self.assertIn(kw, names)
+
+    def test_sparse_acquisition_fields_are_not_filters(self):
+        import scigantic_emdb
+        names = scigantic_emdb.EmdbCatalog.search.__code__.co_varnames
+        for kw in ("recording_mode", "n_movies", "cs_mm", "recon_software"):
+            self.assertNotIn(kw, names)
+
+    def test_near_matches_within_tolerance_and_excludes_missing(self):
+        from scigantic_emdb._coerce import _near
+        self.assertTrue(_near(300.0, 300, 0.5))
+        self.assertTrue(_near(299.8, 300, 0.5))
+        self.assertFalse(_near(200.0, 300, 0.5))
+        self.assertFalse(_near(None, 300, 0.5))
+        self.assertFalse(_near(float("nan"), 300, 0.5))
+        self.assertFalse(_near("n/a", 300, 0.5))
+        self.assertTrue(_near(None, None, 0.5))     # no filter requested
+
+    def test_the_rehearsal_voltage_case(self):
+        # EMD-0731 records 200 kV. A search for 300 kV must not return it.
+        from scigantic_emdb._coerce import _near
+        self.assertFalse(_near(200.0, 300, 0.5))
+        self.assertTrue(_near(200.0, 200, 0.5))
+
+
+class TestDatasetsWithMultipleStates(unittest.TestCase):
+    """One raw dataset, several deposited maps: different copy numbers or point
+    groups across the maps mean more than one assembly state in the data."""
+
+    @staticmethod
+    def _cat(rows):
+        import pandas as pd
+        from scigantic_emdb import EmdbCatalog
+        return EmdbCatalog(), pd.DataFrame(rows)
+
+    def _row(self, i, empiar, copies=None, sym=None, raw=50.0, method="single-particle reconstruction"):
+        return {"id": "EMD-%d" % i, "title": "map %d" % i, "method": method,
+                "empiar_ids": [empiar], "max_chain_copies": copies, "symmetry": sym,
+                "raw_size_gb": raw, "resolution_a": 3.5, "voltage_kv": 300.0,
+                "detector": "GATAN K3 (6k x 4k)"}
+
+    def test_finds_a_monomer_and_trimer_dataset(self):
+        cat, df = self._cat([self._row(1, "10176", 1, "C1"), self._row(2, "10176", 3, "C3"),
+                             self._row(3, "10200", 3, "C3"), self._row(4, "10200", 3, "C3")])
+        out = cat.datasets_with_multiple_states(df)
+        self.assertEqual(list(out["empiar_id"]), ["10176"])
+        self.assertEqual(out.iloc[0]["n_states"], 2)
+        self.assertEqual(out.iloc[0]["copies"], [1, 3])
+
+    def test_single_map_and_non_spa_and_oversize_are_excluded(self):
+        cat, df = self._cat([
+            self._row(1, "A", 1, "C1"),                                           # one map
+            self._row(2, "B", 1, "C1", method="tomography"), self._row(3, "B", 3, "C3", method="tomography"),
+            self._row(4, "C", 1, "C1", raw=900.0), self._row(5, "C", 3, "C3", raw=900.0),
+        ])
+        self.assertEqual(len(cat.datasets_with_multiple_states(df)), 1)       # only C, size unbounded
+        self.assertEqual(len(cat.datasets_with_multiple_states(df, max_raw_gb=500)), 0)
+
+    def test_missing_copies_and_symmetry_never_count_as_a_state(self):
+        nan = float("nan")
+        cat, df = self._cat([self._row(1, "D", nan, nan), self._row(2, "D", 3, "C3")])
+        self.assertEqual(len(cat.datasets_with_multiple_states(df)), 0)       # one known state only
+
+    def test_search_exposes_the_copy_filters(self):
+        import scigantic_emdb
+        names = scigantic_emdb.EmdbCatalog.search.__code__.co_varnames
+        for kw in ("min_chain_copies", "max_chain_copies"):
+            self.assertIn(kw, names)
+
+
 class TestCatalogHonesty(unittest.TestCase):
     """Defect 1 and 7: claims must be measured, and fields must be populated."""
 
