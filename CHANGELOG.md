@@ -3,6 +3,25 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## Unreleased
+
+### Added
+- `EmdbCatalog.search()` filters on acquisition and reconstruction fields read from
+  the deposit: `voltage_kv`, `detector`, `min_dose`/`max_dose`,
+  `min_particles`/`max_particles`, `symmetry`, `min_pixel_a`/`max_pixel_a`. These
+  make "300 kV K3 datasets with public raw movies under 300 GB" a single call. They
+  need a catalog rebuilt with the matching enrichment fields (`detector`,
+  `dose_e_a2`, `particles_used`); on an older catalog a record missing the field is
+  excluded, as with every other filter.
+- `min_chain_copies`/`max_chain_copies`: copies of the most repeated protein chain
+  (the oligomeric order for a single protein).
+- `EmdbCatalog.datasets_with_multiple_states()`: EMPIAR datasets whose deposited maps
+  differ in copy number or point group, the signature of more than one assembly
+  state in the raw data. A heuristic that ranks candidates for a person to read.
+- Fields too sparse to filter on (`recording_mode` 18%, `n_movies` 32%, `cs_mm`
+  34%, `recon_software` 53%) are in the records but deliberately not filters, and a
+  test pins that.
+
 ## [0.4.3] - 2026-08-31
 
 ### Fixed

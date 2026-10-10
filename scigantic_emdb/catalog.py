@@ -2,7 +2,7 @@
 from __future__ import annotations
 import gzip
 
-from ._coerce import _as_list, _nonempty, _num_ok, _truthy
+from ._coerce import _as_list, _near, _nonempty, _num_ok, _truthy
 from ._query import (FIELD_WEIGHT, LIGAND_ALIASES, SEARCH_FIELDS, adaptive_terms,
                      field_text, match_score, notable_ligands)
 from .accession import acc, image_url
@@ -84,7 +84,11 @@ class EmdbCatalog:
                complex_kda_min=None, has_half_maps=None, has_mask=None,
                has_model=None, microscope=None, ligand=None,
                has_raw_data=None, max_raw_gb=None, min_raw_gb=None,
-               min_proteins=None, max_proteins=None, has_ligand=None):
+               min_proteins=None, max_proteins=None, has_ligand=None,
+               voltage_kv=None, detector=None, min_dose=None, max_dose=None,
+               min_particles=None, max_particles=None, symmetry=None,
+               min_pixel_a=None, max_pixel_a=None,
+               min_chain_copies=None, max_chain_copies=None):
         """Find structures by scientific content.
 
         query       free text over title, sample name, organism, method and
@@ -138,6 +142,38 @@ class EmdbCatalog:
                         linked dataset runs to hundreds of GB, so this is the
                         difference between "reprocessable" and "reprocessable
                         by me".
+
+        voltage_kv      acceleration voltage in kV, matched within 0.5 (so 300 finds
+                        300.0). Reported by essentially every entry.
+        detector        substring of the camera model, e.g. "K3", "FALCON",
+                        "K2". Reported by about 99% of entries.
+        min_dose/max_dose
+                        total electron dose in e/A^2 as the depositor recorded
+                        it. About 98% of entries report one.
+        min_particles/max_particles
+                        particles in the final deposited reconstruction. About
+                        99.8% report it. This is the honest scale of a published
+                        map: how many particles a result at your target
+                        resolution really used.
+        symmetry        applied point group, exact match, e.g. "C3", "D2". Only
+                        about 37% of entries report one, so an absent record is
+                        unknown, not C1.
+        min_pixel_a/max_pixel_a
+                        pixel size of the deposited MAP. It can differ from the
+                        acquisition pixel when the depositor rebinned the map,
+                        so it describes the volume, not the movies.
+
+        min_chain_copies/max_chain_copies
+                        copies of the most repeated protein chain, as deposited.
+                        For a single protein this is the oligomeric order, so
+                        min_chain_copies=2 is "an oligomer" and
+                        min_chain_copies=3, max_chain_copies=3 is "a trimer". For a
+                        complex it is the largest repeat, not the stoichiometry.
+
+        These acquisition fields come from the deposit. recording_mode, n_movies,
+        cs_mm and recon_software are in the records too, but only 18-53% of
+        entries report them, so they are deliberately NOT filters: a record
+        without one is unknown, not negative.
 
         A record missing the field being filtered on is EXCLUDED, never silently
         kept. Molecular fields come from depositions and are not universal, so
@@ -210,6 +246,20 @@ class EmdbCatalog:
             if has_raw_data is not None and bool(_nonempty(r.get("empiar_ids"))) != bool(has_raw_data):
                 return False
             if not _num_ok(r.get("raw_size_gb"), min_raw_gb, max_raw_gb):
+                return False
+            if voltage_kv is not None and not _near(r.get("voltage_kv"), voltage_kv, 0.5):
+                return False
+            if detector and detector.lower() not in field_text(r.get("detector")).lower():
+                return False
+            if not _num_ok(r.get("dose_e_a2"), min_dose, max_dose):
+                return False
+            if not _num_ok(r.get("particles_used"), min_particles, max_particles):
+                return False
+            if symmetry and str(symmetry).strip().lower() != field_text(r.get("symmetry")).strip().lower():
+                return False
+            if not _num_ok(r.get("pixel_a"), min_pixel_a, max_pixel_a):
+                return False
+            if not _num_ok(r.get("max_chain_copies"), min_chain_copies, max_chain_copies):
                 return False
             return True
 
@@ -299,6 +349,65 @@ class EmdbCatalog:
                 f'<div style="color:#999">{" &middot; ".join(bits)}</div></div>')
         return HTML('<div style="display:flex;flex-wrap:wrap;gap:10px">'
                     + "".join(cells) + "</div>")
+
+    def datasets_with_multiple_states(self, df=None, *, min_maps=2, min_states=2,
+                                      max_raw_gb=None):
+        """EMPIAR datasets whose deposited maps describe more than one assembly state.
+
+        One raw dataset often yields several deposited maps. When those maps differ
+        in copy number or point group (a monomer and a trimer, C1 and C3), the data
+        contain more than one oligomeric state or conformation, which is the case a
+        single-state pipeline gets wrong. A single search cannot find these: the
+        evidence sits across the sibling maps of one dataset, not in any one record.
+
+        The count is a HEURISTIC over deposited metadata. A dataset can also trip it
+        by depositing a symmetric map and a symmetry-expanded map of the same
+        species (C3 and C1), so read the titles before trusting a hit. It ranks
+        candidates; it does not certify them. Entries with no copy number or point
+        group never count as a state, and datasets are returned only if at least
+        `min_maps` single-particle maps link to them.
+
+        Returns a DataFrame, most distinct states first: empiar_id, n_maps,
+        n_states, copies, symmetries, best_res_a, raw_size_gb, voltage_kv,
+        detector, emdb_ids, example_title. `max_raw_gb` bounds the raw dataset size.
+        """
+        import pandas as pd
+        src = self.load() if df is None else df
+        by = {}
+        for r in src.to_dict("records"):
+            if "single-particle" not in field_text(r.get("method")).lower():
+                continue
+            for e in _as_list(r.get("empiar_ids")):
+                by.setdefault(str(e), []).append(r)
+        out = []
+        for eid, rs in by.items():
+            if len(rs) < min_maps:
+                continue
+            copies = sorted({int(float(r["max_chain_copies"])) for r in rs
+                             if _num_ok(r.get("max_chain_copies"), 1, None)})
+            syms = sorted({str(r["symmetry"]).strip() for r in rs if _nonempty(r.get("symmetry"))})
+            n_states = max(len(copies), len(syms))
+            if n_states < min_states:
+                continue
+            raws = [float(r["raw_size_gb"]) for r in rs if _num_ok(r.get("raw_size_gb"), 0, None)]
+            raw = max(raws) if raws else None
+            if max_raw_gb is not None and (raw is None or raw > max_raw_gb):
+                continue
+            ress = [float(r["resolution_a"]) for r in rs if _num_ok(r.get("resolution_a"), 0, None)]
+            volts = sorted({float(r["voltage_kv"]) for r in rs if _num_ok(r.get("voltage_kv"), 0, None)})
+            dets = sorted({str(r["detector"]).strip() for r in rs if _nonempty(r.get("detector"))})
+            out.append({
+                "empiar_id": eid, "n_maps": len(rs), "n_states": n_states,
+                "copies": copies, "symmetries": syms,
+                "best_res_a": min(ress) if ress else None, "raw_size_gb": raw,
+                "voltage_kv": volts[0] if len(volts) == 1 else (volts or None),
+                "detector": dets[0] if len(dets) == 1 else (dets or None),
+                "emdb_ids": sorted(str(r.get("id")) for r in rs),
+                "example_title": str(rs[0].get("title") or "")[:90],
+            })
+        out.sort(key=lambda d: (-d["n_states"], -d["n_maps"],
+                                d["raw_size_gb"] if d["raw_size_gb"] is not None else 1e12))
+        return pd.DataFrame(out)
 
     def with_empiar(self, df=None, limit=None):
         """Join EMDB hits to the raw EMPIAR datasets behind them.
