@@ -2,11 +2,21 @@
 from __future__ import annotations
 import gzip
 
+import re
+
 from ._coerce import _as_list, _near, _nonempty, _num_ok, _truthy
 from ._query import (FIELD_WEIGHT, LIGAND_ALIASES, SEARCH_FIELDS, adaptive_terms,
                      field_text, match_score, notable_ligands)
 from .accession import acc, image_url
 from .config import CATALOG_URL, MOUNT, _session
+
+
+# Oligomer words in a map's title. A dataset whose maps are titled "monomer" and
+# "trimer" has two assembly states even when the maps share a copy number and a point
+# group, which is exactly how EMPIAR-10176 (AP-1:Arf1:tetherin-Nef) reads.
+_OLIGOMER_WORD = re.compile(
+    r"\b(monomer|dimer|trimer|tetramer|pentamer|hexamer|heptamer|octamer|dodecamer|"
+    r"tetradecamer|hexadecamer)(?:ic)?\b", re.I)
 
 
 class EmdbCatalog:
@@ -148,8 +158,11 @@ class EmdbCatalog:
         detector        substring of the camera model, e.g. "K3", "FALCON",
                         "K2". Reported by about 99% of entries.
         min_dose/max_dose
-                        total electron dose in e/A^2 as the depositor recorded
-                        it. About 98% of entries report one.
+                        electron dose in e/A^2 as the depositor typed it. About 99%
+                        of entries report one, but the units are not uniform: 84%
+                        are 20-100 e/A^2 totals, while 11% are under 5 and are
+                        almost certainly per-frame or per-second. Use min_dose=20
+                        when you mean a total dose.
         min_particles/max_particles
                         particles in the final deposited reconstruction. About
                         99.8% report it. This is the honest scale of a published
@@ -367,8 +380,16 @@ class EmdbCatalog:
         group never count as a state, and datasets are returned only if at least
         `min_maps` single-particle maps link to them.
 
+        Three signals, and n_states is the largest of them: distinct copy numbers,
+        distinct point groups, and distinct oligomer words in the map titles
+        (monomer, trimer, ...). The title signal exists because the other two missed
+        EMPIAR-10176, whose monomer and trimer maps share a copy number and a point
+        group. Any one signal can mislead: rabbit aldolase deposited with C1 and with
+        D2 symmetry is one state imposed two ways, and no signal sees a dataset whose
+        states the depositor never named. Treat the output as a reading list.
+
         Returns a DataFrame, most distinct states first: empiar_id, n_maps,
-        n_states, copies, symmetries, best_res_a, raw_size_gb, voltage_kv,
+        n_states, copies, symmetries, title_states, best_res_a, raw_size_gb, voltage_kv,
         detector, emdb_ids, example_title. `max_raw_gb` bounds the raw dataset size.
         """
         import pandas as pd
@@ -386,7 +407,9 @@ class EmdbCatalog:
             copies = sorted({int(float(r["max_chain_copies"])) for r in rs
                              if _num_ok(r.get("max_chain_copies"), 1, None)})
             syms = sorted({str(r["symmetry"]).strip() for r in rs if _nonempty(r.get("symmetry"))})
-            n_states = max(len(copies), len(syms))
+            words = sorted({m.group(1).lower() for r in rs
+                            for m in _OLIGOMER_WORD.finditer(str(r.get("title") or ""))})
+            n_states = max(len(copies), len(syms), len(words))
             if n_states < min_states:
                 continue
             raws = [float(r["raw_size_gb"]) for r in rs if _num_ok(r.get("raw_size_gb"), 0, None)]
@@ -398,7 +421,7 @@ class EmdbCatalog:
             dets = sorted({str(r["detector"]).strip() for r in rs if _nonempty(r.get("detector"))})
             out.append({
                 "empiar_id": eid, "n_maps": len(rs), "n_states": n_states,
-                "copies": copies, "symmetries": syms,
+                "copies": copies, "symmetries": syms, "title_states": words,
                 "best_res_a": min(ress) if ress else None, "raw_size_gb": raw,
                 "voltage_kv": volts[0] if len(volts) == 1 else (volts or None),
                 "detector": dets[0] if len(dets) == 1 else (dets or None),

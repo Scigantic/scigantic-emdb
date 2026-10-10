@@ -619,6 +619,17 @@ class TestDatasetsWithMultipleStates(unittest.TestCase):
         cat, df = self._cat([self._row(1, "D", nan, nan), self._row(2, "D", 3, "C3")])
         self.assertEqual(len(cat.datasets_with_multiple_states(df)), 0)       # one known state only
 
+    def test_title_words_find_a_dataset_the_other_signals_miss(self):
+        # EMPIAR-10176: monomer and trimer maps with the same copies and point group.
+        rows = [self._row(1, "10176", 1, "C1"), self._row(2, "10176", 1, "C1")]
+        rows[0]["title"] = "AP-1:Arf1:tetherin-Nef monomer"
+        rows[1]["title"] = "AP-1:Arf1:tetherin-Nef closed trimeric assembly"
+        cat, df = self._cat(rows)
+        out = cat.datasets_with_multiple_states(df)
+        self.assertEqual(list(out["empiar_id"]), ["10176"])
+        self.assertEqual(out.iloc[0]["title_states"], ["monomer", "trimer"])
+        self.assertEqual(out.iloc[0]["n_states"], 2)
+
     def test_search_exposes_the_copy_filters(self):
         import scigantic_emdb
         names = scigantic_emdb.EmdbCatalog.search.__code__.co_varnames
