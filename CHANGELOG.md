@@ -5,6 +5,10 @@ follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.5.0] - 2026-10-10
 
+### Fixed
+- `scigantic_emdb.__version__` reported 0.4.2 in the 0.4.3 release; it now matches
+  `pyproject.toml`.
+
 ### Changed
 - `datasets_with_multiple_states()` also counts distinct oligomer words in the map
   titles (monomer, trimer, ...) and returns them as `title_states`. The copy-number

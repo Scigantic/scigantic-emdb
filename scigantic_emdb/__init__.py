@@ -48,7 +48,7 @@ from .config import CATALOG_URL, FTP, MOUNT, SUBDIRS
 from .files import entry_files
 from .maps import load_map, slices
 
-__version__ = "0.4.2"
+__version__ = "0.5.0"
 
 __all__ = [
     # catalog
