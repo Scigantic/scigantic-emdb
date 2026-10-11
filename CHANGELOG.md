@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## Unreleased
+## [0.5.0] - 2026-10-10
 
 ### Changed
 - `datasets_with_multiple_states()` also counts distinct oligomer words in the map
