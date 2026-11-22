@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.6.0] - 2026-11-21
+
+### Changed
+- Python 3.9 is no longer supported; the package now requires Python 3.10 or
+  newer. 3.9 reached end of life in October 2025 and the CI runner image no
+  longer provides it. Nothing else changed: on 3.9, pip keeps installing 0.5.0.
+- PyPI metadata: an Image Processing topic classifier and a Documentation
+  link.
+
 ## [0.5.0] - 2026-10-10
 
 ### Fixed
