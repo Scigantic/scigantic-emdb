@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+title: scigantic-emdb
+abstract: "Search the structures in EMDB from Python by protein, organism, resolution, molecular weight and PDB cross-reference, then read a cryo-EM map over HTTP."
+authors:
+  - name: Scigantic
+    website: https://scigantic.com
+repository-code: https://github.com/Scigantic/scigantic-emdb
+url: https://pypi.org/project/scigantic-emdb/
+license: MIT
+keywords:
+  - "cryo-em"
+  - "cryo-et"
+  - "emdb"
+  - "empiar"
+  - "mrc"
+  - "structural-biology"
+  - "microscopy"
+version: "0.6.0"
+date-released: '2026-11-22'
