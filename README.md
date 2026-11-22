@@ -5,7 +5,7 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/scigantic-emdb)](https://pypi.org/project/scigantic-emdb/)
 [![License](https://img.shields.io/github/license/Scigantic/scigantic-emdb)](https://github.com/Scigantic/scigantic-emdb/blob/main/LICENSE)
 
-Search every structure in [EMDB](https://www.ebi.ac.uk/emdb/), EMBL-EBI's public archive of 3D cryo-EM density maps, and read one in two calls.
+Search every structure in [EMDB](https://www.ebi.ac.uk/emdb/), EMBL-EBI's public archive of 3D cryo-EM density maps, from Python: 60,895 entries by protein, organism, resolution, molecular weight, ligand, microscope and PDB cross-reference. Then load a map as a NumPy array in two calls.
 
 ```bash
 pip install "scigantic-emdb[maps]"
@@ -20,6 +20,10 @@ cat.search("GPCR", organism="Homo sapiens", max_res=3.0, sort="resolution")
 vol, meta = load_map("EMD-22962")   # decompresses, caches, opens
 slices(vol)                          # central XY / XZ / YZ sections
 ```
+
+## Try it on hosted data
+
+The Scigantic catalog entry for [EMDB](https://scigantic.com/archive/b1f4c8e2-3d7a-5c91-84b6-2e9f7a3c5d18?utm_source=github&utm_medium=readme&utm_campaign=scigantic-emdb) opens a Jupyter notebook in the browser with the archive mounted read-only, so maps are read in place with no download step. The raw micrographs behind the maps are in [EMPIAR](https://scigantic.com/archive/e3d9a7c0-1f2b-4a6d-9c8e-2b7f4a1c6e05?utm_source=github&utm_medium=readme&utm_campaign=scigantic-emdb), and more open cryo-EM data is listed under [cryo-EM datasets](https://scigantic.com/topics/cryo-em?utm_source=github&utm_medium=readme&utm_campaign=scigantic-emdb).
 
 ## Why this exists
 

@@ -41,6 +41,7 @@ dev = ["pytest", "numpy", "mrcfile", "matplotlib"]
 
 [project.urls]
 Homepage = "https://scigantic.com"
+"EMDB in a hosted notebook" = "https://scigantic.com/archive/b1f4c8e2-3d7a-5c91-84b6-2e9f7a3c5d18?utm_source=pypi&utm_medium=project-urls&utm_campaign=scigantic-emdb"
 Repository = "https://github.com/Scigantic/scigantic-emdb"
 Issues = "https://github.com/Scigantic/scigantic-emdb/issues"
 "EMDB" = "https://www.ebi.ac.uk/emdb/"
